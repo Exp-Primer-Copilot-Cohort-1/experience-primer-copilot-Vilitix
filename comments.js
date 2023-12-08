@@ -1,79 +1,55 @@
 // Create web server
+// 1. Create a web server
+// 2. Handle root path
+// 3. Handle comments path
+// 4. Handle 404 path
+// 5. Start listening
 
-// Require Express
-const express = require('express');
+// 1. Create a web server
+const http = require('http');
+const fs = require('fs');
+const url = require('url');
+const port = 3000;
 
-// Require path
-const path = require('path');
-
-// Require body-parser
-const bodyParser = require('body-parser');
-
-// Require mongoose
-const mongoose = require('mongoose');
-
-// Require express-handlebars
-const hbs = require('express-handlebars');
-
-// Require morgan
-const logger = require('morgan');
-
-// Require cheerio
-const cheerio = require('cheerio');
-
-// Require request
-const request = require('request');
-
-// Require models
-const db = require('./models');
-
-// Set port
-const PORT = process.env.PORT || 3000;
-
-// Initialize Express
-const app = express();
-
-// Use morgan for logging requests
-app.use(logger('dev'));
-
-// Use body-parser for handling form submissions
-app.use(bodyParser.urlencoded({ extended: true }));
-
-// Use express.static to serve the public folder as a static directory
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Set handlebars as the default templating engine
-app.engine('handlebars', hbs({ defaultLayout: 'main' }));
-app.set('view engine', 'handlebars');
-
-// Connect to the Mongo DB
-mongoose.Promise = Promise;
-mongoose.connect('mongodb://localhost/techcrunch', {
-  useMongoClient: true
+// 2. Handle root path
+const server = http.createServer((req, res) => {
+    const path = url.parse(req.url, true);
+    const filename = "." + path.pathname;
+    fs.readFile(filename, (err, data) => {
+        if (err) {
+            res.writeHead(404, {'Content-Type': 'text/html'});
+            return res.end("404 Not Found");
+        }
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.write(data);
+        return res.end();
+    });
 });
 
-// Routes
+// 3. Handle comments path
+server.on('request', (req, res) => {
+    if (req.url === '/comments') {
+        const path = url.parse(req.url, true);
+        const filename = "." + path.pathname;
+        fs.readFile(filename, (err, data) => {
+            if (err) {
+                res.writeHead(404, {'Content-Type': 'text/html'});
+                return res.end("404 Not Found");
+            }
+            res.writeHead(200, {'Content-Type': 'text/html'});
+            res.write(data);
+            return res.end();
+        });
+    }
+});
 
-// GET route for scraping TechCrunch website
-app.get('/scrape', (req, res) => {
-  // Grab the body of the html with request
-  request('https://techcrunch.com/', (error, response, html) => {
-    // Load that into cheerio and save it to $ for a shorthand selector
-    const $ = cheerio.load(html);
-    // Grab every article tag, and do the following:
-    $('article').each((i, element) => {
-      // Save an empty result object
-      const result = {};
-      // Add the title, summary, href, and image of every article, and save them as properties of the result object
-      result.title = $(element)
-        .children('.post-block__header')
-        .children('.post-block__title')
-        .children('a')
-        .text();
-      result.summary = $(element)
-        .children('.post-block__content')
-        .children('.post-block__content--excerpt')
-        .text();
-      result.link = $(element)
-        .children('.post-block__header')
-        .children('.post-block__title')
+// 4. Handle 404 path
+server.on('request', (req, res) => {
+    res.writeHead(404, {'Content-Type': 'text/html'});
+    return res.end("404 Not Found");
+});
+
+// 5. Start listening
+server.listen(port, () => {
+    console.log(`Server is running at http://localhost:${port}`);
+});
