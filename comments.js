@@ -1,65 +1,66 @@
 // Create Web server 
-// 1. Create Web server
-// 2. Read comment.html file
-// 3. Read comment.json file
-// 4. Create comments array
-// 5. Create Web server
-// 6. Create API
-// 7. Create API for read comment
-// 8. Create API for create comment
-// 9. Create API for update comment
-// 10. Create API for delete comment
 
-// 1. Create Web server
-const express = require('express');
-const app = express();
-const port = 3000;
+var express = require('express');
+var router = express.Router();
+var mongoose = require('mongoose');
+var Comment = mongoose.model('Comment');
+var jwt = require('express-jwt');
 
-// 2. Read comment.html file
-const fs = require('fs');
-const html = fs.readFileSync('comment.html', 'utf8');
+//middleware for authenticating jwt tokens
+var auth = jwt({secret: 'SECRET', userProperty: 'payload'});
 
-// 3. Read comment.json file
-const data = fs.readFileSync('comment.json', 'utf8');
-const comments = JSON.parse(data);
+// GET route for getting all comments
+router.get('/', function(req, res, next) {
+  Comment.find(function(err, comments){
+    if(err){ return next(err); }
 
-// 4. Create comments array
-// const comments = [
-//   { id: 1, name: '홍길동', comment: '안녕하세요' },
-//   { id: 2, name: '임꺽정', comment: '두번째 댓글입니다' },
-// ];
-
-// 5. Create Web server
-app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`);
+    res.json(comments);
+  });
 });
 
-// 6. Create API
-// 7. Create API for read comment
-app.get('/api/comments', (req, res) => {
-  res.json(comments);
+// POST route for creating comments
+router.post('/', auth, function(req, res, next) {
+  var comment = new Comment(req.body);
+  comment.author = req.payload.username;
+
+  comment.save(function(err, comment){
+    if(err){ return next(err); }
+
+    res.json(comment);
+  });
 });
 
-// 8. Create API for create comment
-app.post('/api/comments', (req, res) => {
-  const body = req.body;
-  const name = body.name;
-  const comment = body.comment;
-  const id = Date.now();
-  const commentObj = { id, name, comment };
-  comments.push(commentObj);
-  res.json(commentObj);
+// Preload comment objects on routes with ':comment'
+router.param('comment', function(req, res, next, id) {
+  var query = Comment.findById(id);
+
+  query.exec(function (err, comment){
+    if (err) { return next(err); }
+    if (!comment) { return next(new Error('can\'t find comment')); }
+
+    req.comment = comment;
+    return next();
+  });
 });
 
-// 9. Create API for update comment
-app.put('/api/comments/:id', (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const body = req.body;
-  const name = body.name;
-  const comment = body.comment;
-  const commentObj = { id, name, comment };
+// GET route for returning a comment
+router.get('/:comment', function(req, res) {
+  res.json(req.comment);
+});
 
-  for (let i = 0; i < comments.length; i++) {
-    if (comments[i].id === id) {
-      comments[i] = commentObj;
-      break;
+// PUT route for updating a comment
+router.put('/:comment/upvote', auth, function(req, res, next) {
+  req.comment.upvote(function(err, comment){
+    if (err) { return next(err); }
+
+    res.json(comment);
+  });
+});
+
+// DELETE route for deleting a comment
+router.delete('/:comment', auth, function(req, res) {
+  req.comment.remove();
+  res.sendStatus(200);
+});
+
+module.exports = router;
